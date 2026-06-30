@@ -1,0 +1,3 @@
+---
+# No handlers needed: this role does not modify the image's GUI/VNC/lightdm
+# stack, so there is nothing to restart here.
